@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>画像形式変換ツール | image-shift</title>
+  <meta name="description" content="PNG・JPEG・WebP・AVIF など、ブラウザで扱える画像を別形式へ変換する完全静的ツールです。画像は外部へ送信されません。" />
+  <meta name="robots" content="index, follow, max-image-preview:large" />
+  <meta name="author" content="smizuoch" />
+  <meta name="application-name" content="image-shift" />
+  <meta name="theme-color" content="#2563ff" />
+  <link rel="canonical" href="https://smizuoch.me/image-shift/" />
+
+  <meta property="og:type" content="website" />
+  <meta property="og:locale" content="ja_JP" />
+  <meta property="og:site_name" content="image-shift" />
+  <meta property="og:title" content="画像形式変換ツール | image-shift" />
+  <meta property="og:description" content="画像の幅と高さを保ったまま、PNG / JPEG / WebP などへブラウザ内だけで変換します。" />
+  <meta property="og:url" content="https://smizuoch.me/image-shift/" />
+
+  <script>
+    (() => {
+      const storageKey = 'image-shift-theme';
+      const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      let theme = systemTheme;
+      try {
+        const savedTheme = localStorage.getItem(storageKey);
+        if (savedTheme === 'light' || savedTheme === 'dark') {
+          theme = savedTheme;
+        }
+      } catch {
+        theme = systemTheme;
+      }
+      document.documentElement.dataset.theme = theme;
+      const themeColorMeta = document.querySelector('meta[name="theme-color"]');
+      if (themeColorMeta) {
+        themeColorMeta.content = theme === 'dark' ? '#101725' : '#2563ff';
+      }
+    })();
+  </script>
+
+  <link rel="stylesheet" href="./assets/css/reset.css" />
+  <link rel="stylesheet" href="./assets/css/base.css" />
+  <link rel="stylesheet" href="./assets/css/layout.css" />
+  <link rel="stylesheet" href="./assets/css/components.css" />
+</head>
+<body>
+  <main>
+    <div class="app-shell">
+      <button class="theme-toggle" id="themeToggle" type="button" aria-label="ダークモードに切り替え" title="ダークモードに切り替え">
+        <svg class="theme-icon-moon" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M20 14.2A7.8 7.8 0 0 1 9.8 4a8.6 8.6 0 1 0 10.2 10.2Z" />
+        </svg>
+        <svg class="theme-icon-sun" viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="12" cy="12" r="4" />
+          <path d="M12 2.5V5.2M12 18.8v2.7M21.5 12h-2.7M5.2 12H2.5M18.7 5.3l-1.9 1.9M7.2 16.8l-1.9 1.9M18.7 18.7l-1.9-1.9M7.2 7.2 5.3 5.3" />
+        </svg>
+      </button>
+
+      <section class="dialog" aria-labelledby="pageTitle">
+        <section class="workspace">
+          <label class="dropzone" id="dropzone" tabindex="0" aria-label="画像をアップロード">
+            <input class="sr-only" id="fileInput" type="file" accept="image/*" />
+            <div id="dropzoneContent">
+              <div class="dropzone-icon" aria-hidden="true">
+                <svg viewBox="0 0 128 128" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <rect x="18" y="38" width="72" height="54" rx="16" style="stroke: var(--illustration-stroke);" stroke-width="5" />
+                  <path d="M18 76.5L40 54L58 71L70 59L90 80" style="stroke: var(--illustration-stroke);" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" />
+                  <circle cx="72" cy="54" r="8" style="stroke: var(--illustration-stroke);" stroke-width="5" />
+                  <path d="M82 22H108C113.523 22 118 26.477 118 32V86C118 91.523 113.523 96 108 96H96" style="stroke: var(--illustration-accent);" stroke-width="18" stroke-linecap="round" opacity="0.85" />
+                </svg>
+                <div class="dropzone-plus">+</div>
+              </div>
+              <p class="dropzone-title">画像をドラッグ＆ドロップ または <span class="link">参照</span></p>
+              <p class="dropzone-help">ブラウザが読み込める画像形式に対応。画像は外部へ送信されません。</p>
+            </div>
+          </label>
+
+          <div class="editor-layout hidden" id="editorLayout">
+            <div class="preview-grid">
+              <article class="preview-card">
+                <div class="preview-stage">
+                  <img class="preview-image" id="beforePreview" alt="元画像プレビュー" />
+                </div>
+              </article>
+
+              <article class="preview-card">
+                <div class="preview-stage">
+                  <img class="preview-image hidden" id="afterPreview" alt="変換後プレビュー" />
+                  <div class="preview-empty" id="afterPlaceholder">変換後のプレビューがここに表示されます</div>
+                </div>
+              </article>
+            </div>
+          </div>
+        </section>
+
+        <aside class="side-panel">
+          <h1 class="panel-title" id="pageTitle">画像形式変換ツール</h1>
+          <p class="panel-description">画像の幅・高さを保ったまま、PNG / JPEG / WebP / AVIF / BMP / ICO などへ変換します。処理はすべてブラウザ内だけで完結します。</p>
+          <hr class="divider" />
+
+          <div class="stack">
+            <div class="field">
+              <label for="formatSelect">出力形式</label>
+              <select class="select" id="formatSelect"></select>
+              <p class="field-help" id="formatHelp">ブラウザで書き出せる形式と、静的JSで生成できる形式を表示します。</p>
+            </div>
+
+            <div class="field">
+              <div class="field-row">
+                <label for="qualityInput">品質</label>
+                <output id="qualityValue" for="qualityInput">92%</output>
+              </div>
+              <input class="range-input" id="qualityInput" type="range" min="1" max="100" value="92" />
+              <p class="field-help" id="qualityHelp">JPEG / WebP / AVIF などの非可逆変換で使います。</p>
+            </div>
+
+            <div class="field">
+              <label class="toggle-row" for="losslessInput">
+                <span>
+                  <strong>Lossless モード</strong>
+                  <small>可能な形式では品質劣化なしで書き出します</small>
+                </span>
+                <input id="losslessInput" type="checkbox" />
+              </label>
+            </div>
+
+            <div class="field" id="matteField">
+              <label for="matteColorInput">透過の背景色</label>
+              <div class="color-row">
+                <input class="color-input" id="matteColorInput" type="color" value="#ffffff" />
+                <input class="text-input" id="matteTextInput" type="text" value="#ffffff" maxlength="7" inputmode="text" />
+              </div>
+              <p class="field-help">JPEGのように透過できない形式へ変換するとき、この色で合成します。</p>
+            </div>
+
+            <div class="button-row">
+              <button class="secondary" id="replaceButton" type="button">画像を差し替え</button>
+              <button class="primary" id="convertButton" type="button">変換を開始</button>
+            </div>
+
+            <div class="button-row button-row-single">
+              <button class="primary primary-wide" id="downloadButton" type="button" disabled>ダウンロード</button>
+            </div>
+
+            <div class="status-note" id="statusNote">画像を読み込むと、ここに変換状況を表示します。</div>
+            <div class="error-note hidden" id="errorNote" role="alert"></div>
+          </div>
+        </aside>
+      </section>
+    </div>
+
+    <section class="seo-section" aria-labelledby="toolSummaryTitle">
+      <div class="seo-card">
+        <div class="seo-grid">
+          <div>
+            <p class="seo-kicker">Static Browser Tool</p>
+            <h2 class="seo-heading" id="toolSummaryTitle">画像を別形式へすばやく変換</h2>
+            <p class="seo-text">image-shift は HTML / CSS / JavaScript だけで動く完全静的サイトです。GitHub Pages にそのまま配置でき、画像ファイルはサーバーへアップロードされません。</p>
+            <p class="seo-text">入力はブラウザが読み込める画像形式全般、出力は現在のブラウザがエンコードできる画像形式に対応します。</p>
+          </div>
+          <div>
+            <h3 class="seo-subtitle">主な仕様</h3>
+            <ul class="seo-list">
+              <li>ドラッグ＆ドロップとファイル選択に対応</li>
+              <li>元画像と変換後の Before / After プレビュー</li>
+              <li>幅・高さは変更せず、元画像と同じ寸法で出力</li>
+              <li>品質調整、Lossless モード、透過背景色の指定に対応</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <noscript>
+    <p class="noscript-note">このツールの利用には JavaScript が必要です。</p>
+  </noscript>
+
+  <script type="module" src="./assets/js/app.js"></script>
+</body>
+</html>
