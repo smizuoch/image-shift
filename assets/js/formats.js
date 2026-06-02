@@ -6,6 +6,7 @@ export const OUTPUT_FORMAT_CANDIDATES = [
     supportsAlpha: true,
     supportsQuality: false,
     lossless: true,
+    encoder: 'canvas',
   },
   {
     mime: 'image/jpeg',
@@ -14,6 +15,7 @@ export const OUTPUT_FORMAT_CANDIDATES = [
     supportsAlpha: false,
     supportsQuality: true,
     lossless: false,
+    encoder: 'canvas',
   },
   {
     mime: 'image/webp',
@@ -22,6 +24,7 @@ export const OUTPUT_FORMAT_CANDIDATES = [
     supportsAlpha: true,
     supportsQuality: true,
     lossless: false,
+    encoder: 'canvas',
   },
   {
     mime: 'image/avif',
@@ -73,8 +76,7 @@ export async function detectSupportedOutputFormats() {
       }
       continue;
     }
-    const blob = await canvasToBlob(canvas, candidate.mime, 0.92);
-    if (blob && normalizeMime(blob.type) === candidate.mime) {
+    if (await canEncodeWithCanvas(canvas, candidate.mime)) {
       supported.push(candidate);
       if (candidate.mime === 'image/png') {
         canEncodePng = true;
@@ -82,6 +84,19 @@ export async function detectSupportedOutputFormats() {
     }
   }
   return supported;
+}
+
+async function canEncodeWithCanvas(canvas, mime) {
+  const blob = await canvasToBlob(canvas, mime, 0.92);
+  if (blob && normalizeMime(blob.type) === mime) {
+    return true;
+  }
+
+  try {
+    return canvas.toDataURL(mime, 0.92).startsWith(`data:${mime}`);
+  } catch {
+    return false;
+  }
 }
 
 export function findFormat(formats, mime) {
